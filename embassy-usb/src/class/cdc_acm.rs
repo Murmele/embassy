@@ -14,7 +14,7 @@ use crate::driver::{Driver, Endpoint, EndpointError, EndpointIn, EndpointOut};
 use crate::types::InterfaceNumber;
 use crate::{Builder, Handler};
 
-/// This should be used as `device_class` when building the `UsbDevice`.
+/// This should be used as `interface_class` when building the `UsbDevice`.
 pub const USB_CLASS_CDC: u8 = 0x02;
 
 const USB_CLASS_CDC_DATA: u8 = 0x0a;
@@ -76,7 +76,7 @@ pub struct CdcAcmClass<'d, D: Driver<'d>> {
 }
 
 struct Control<'a> {
-    comm_if: InterfaceNumber,
+    ctrl_if_number: InterfaceNumber,
     shared: &'a ControlShared,
 }
 
@@ -141,7 +141,7 @@ impl<'d> Handler for Control<'d> {
 
     fn control_out(&mut self, req: control::Request, data: &[u8]) -> Option<OutResponse> {
         if (req.request_type, req.recipient, req.index)
-            != (RequestType::Class, Recipient::Interface, self.comm_if.0 as u16)
+            != (RequestType::Class, Recipient::Interface, self.ctrl_if_number.0 as u16)
         {
             return None;
         }
@@ -188,7 +188,7 @@ impl<'d> Handler for Control<'d> {
 
     fn control_in<'a>(&'a mut self, req: Request, buf: &'a mut [u8]) -> Option<InResponse<'a>> {
         if (req.request_type, req.recipient, req.index)
-            != (RequestType::Class, Recipient::Interface, self.comm_if.0 as u16)
+            != (RequestType::Class, Recipient::Interface, self.ctrl_if_number.0 as u16)
         {
             return None;
         }
@@ -220,8 +220,8 @@ impl<'d, D: Driver<'d>> CdcAcmClass<'d, D> {
 
         // Control interface
         let mut iface = func.interface();
-        let comm_if = iface.interface_number();
-        let data_if = u8::from(comm_if) + 1;
+        let ctrl_if_number = iface.interface_number();
+        let data_if = u8::from(ctrl_if_number) + 1;
         let mut alt = iface.alt_setting(USB_CLASS_CDC, CDC_SUBCLASS_ACM, CDC_PROTOCOL_NONE, None);
 
         alt.descriptor(
@@ -245,9 +245,9 @@ impl<'d, D: Driver<'d>> CdcAcmClass<'d, D> {
         alt.descriptor(
             CS_INTERFACE,
             &[
-                CDC_TYPE_UNION, // bDescriptorSubtype
-                comm_if.into(), // bControlInterface
-                data_if,        // bSubordinateInterface
+                CDC_TYPE_UNION,        // bDescriptorSubtype
+                ctrl_if_number.into(), // bControlInterface
+                data_if,               // bSubordinateInterface
             ],
         );
 
@@ -264,7 +264,7 @@ impl<'d, D: Driver<'d>> CdcAcmClass<'d, D> {
 
         let control = state.control.write(Control {
             shared: &state.shared,
-            comm_if,
+            ctrl_if_number,
         });
         builder.handler(control);
 

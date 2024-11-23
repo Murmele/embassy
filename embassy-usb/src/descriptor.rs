@@ -151,7 +151,7 @@ impl<'a> DescriptorWriter<'a> {
         self.buf[2..4].copy_from_slice(&position.to_le_bytes());
     }
 
-    /// Writes a interface association descriptor. Call from `UsbClass::get_configuration_descriptors`
+    /// Writes an interface association descriptor. Call from `UsbClass::get_configuration_descriptors`
     /// before writing the USB class or function's interface descriptors if your class has more than
     /// one interface and wants to play nicely with composite devices on Windows. If the USB device
     /// hosting the class was not configured as composite with IADs enabled, calling this function
@@ -321,6 +321,7 @@ impl<'a> DescriptorWriter<'a> {
 ///
 /// All device descriptors are always 18 bytes, so there's no need for
 /// a variable-length buffer or DescriptorWriter.
+/// Only one configuration descriptor is supported
 pub(crate) fn device_descriptor(config: &Config) -> [u8; 18] {
     [
         18,   // bLength

@@ -117,6 +117,27 @@ impl<'a> Config<'a> {
             max_power: 100,
         }
     }
+
+    /// Create default configuration with the provided vid and pid values and setup
+    /// device_class, device_sub_class and device_protocol for iad support
+    pub const fn new_iad(vid: u16, pid: u16) -> Self {
+        Self {
+            device_class: 0xEF,
+            device_sub_class: 0x02,
+            device_protocol: 0x01,
+            max_packet_size_0: 64,
+            vendor_id: vid,
+            product_id: pid,
+            device_release: 0x0010,
+            manufacturer: None,
+            product: None,
+            serial_number: None,
+            self_powered: false,
+            supports_remote_wakeup: false,
+            composite_with_iads: true,
+            max_power: 100,
+        }
+    }
 }
 
 /// [`UsbDevice`] builder.
@@ -129,6 +150,8 @@ pub struct Builder<'d, D: Driver<'d>> {
     driver: D,
     next_string_index: u8,
 
+    /// Config descriptor.
+    /// Only one config descriptor
     config_descriptor: DescriptorWriter<'d>,
     bos_descriptor: BosWriter<'d>,
 
@@ -220,10 +243,11 @@ impl<'d, D: Driver<'d>> Builder<'d, D> {
 
     /// Add an USB function.
     ///
-    /// If [`Config::composite_with_iads`] is set, this will add an IAD descriptor
+    /// If [`Config::composite_with_iads`] is set, this will add an IAD descriptor (Interface Association Descriptor)
     /// with the given class/subclass/protocol, associating all the child interfaces.
     ///
     /// If it's not set, no IAD descriptor is added.
+    /// (https://www.usb.org/sites/default/files/iadclasscode_r10.pdf)
     pub fn function(&mut self, class: u8, subclass: u8, protocol: u8) -> FunctionBuilder<'_, 'd, D> {
         let first_interface = InterfaceNumber::new(self.interfaces.len() as u8);
         let iface_count_index = if self.config.composite_with_iads {
