@@ -18,6 +18,9 @@ pub const USB_SUBCLASS_SCSI: u8 = 0x06; // [1]
 pub const USB_INTERFACE_SUBCLASS: u8 = USB_SUBCLASS_SCSI;
 pub const USB_PROTOCOL_BULK_ONLY_TRANSPORT: u8 = 0x50;
 
+pub const USB_BULK_ONLY_RESET_REQUEST: u8 = 0xFF;
+pub const USB_BULK_ONLY_GET_MAX_LUN: u8 = 0xFE;
+
 // TODO: implement Reset and get max LUN [2]
 
 /// Internal state
@@ -139,74 +142,32 @@ impl<'d> Handler for Control<'d> {
     }
 
     fn control_out(&mut self, req: control::Request, data: &[u8]) -> Option<OutResponse> {
-        None
-        // if (req.request_type, req.recipient, req.index)
-        //     != (RequestType::Class, Recipient::Interface, self.ctrl_if_number.0 as u16)
-        // {
-        //     return None;
-        // }
+        if (req.request_type, req.recipient, req.index)
+            != (RequestType::Class, Recipient::Interface, self.ctrl_if_number.0 as u16)
+        {
+            return None;
+        }
 
-        // match req.request {
-        //     REQ_SEND_ENCAPSULATED_COMMAND => {
-        //         // We don't actually support encapsulated commands but pretend we do for standards
-        //         // compatibility.
-        //         Some(OutResponse::Accepted)
-        //     }
-        //     REQ_SET_LINE_CODING if data.len() >= 7 => {
-        //         let coding = LineCoding {
-        //             data_rate: u32::from_le_bytes(data[0..4].try_into().unwrap()),
-        //             stop_bits: data[4].into(),
-        //             parity_type: data[5].into(),
-        //             data_bits: data[6],
-        //         };
-        //         let shared = self.shared();
-        //         shared.line_coding.lock(|x| x.set(coding));
-        //         debug!("Set line coding to: {:?}", coding);
-
-        //         shared.changed.store(true, Ordering::Relaxed);
-        //         shared.waker.borrow_mut().wake();
-
-        //         Some(OutResponse::Accepted)
-        //     }
-        //     REQ_SET_CONTROL_LINE_STATE => {
-        //         let dtr = (req.value & 0x0001) != 0;
-        //         let rts = (req.value & 0x0002) != 0;
-
-        //         let shared = self.shared();
-        //         shared.dtr.store(dtr, Ordering::Relaxed);
-        //         shared.rts.store(rts, Ordering::Relaxed);
-        //         debug!("Set dtr {}, rts {}", dtr, rts);
-
-        //         shared.changed.store(true, Ordering::Relaxed);
-        //         shared.waker.borrow_mut().wake();
-
-        //         Some(OutResponse::Accepted)
-        //     }
-        //     _ => Some(OutResponse::Rejected),
-        // }
+        match req.request {
+            USB_BULK_ONLY_RESET_REQUEST => Some(OutResponse::Accepted), // TODO: do something here. NAK as long as reset is not finished
+            USB_BULK_ONLY_GET_MAX_LUN => Some(OutResponse::Accepted),
+            _ => Some(OutResponse::Rejected),
+        }
     }
 
     fn control_in<'a>(&'a mut self, req: Request, buf: &'a mut [u8]) -> Option<InResponse<'a>> {
-        None
-        // if (req.request_type, req.recipient, req.index)
-        //     != (RequestType::Class, Recipient::Interface, self.ctrl_if_number.0 as u16)
-        // {
-        //     return None;
-        // }
+        if (req.request_type, req.recipient, req.index)
+            != (RequestType::Class, Recipient::Interface, self.ctrl_if_number.0 as u16)
+        {
+            return None;
+        }
 
-        // match req.request {
-        //     // REQ_GET_ENCAPSULATED_COMMAND is not really supported - it will be rejected below.
-        //     REQ_GET_LINE_CODING if req.length == 7 => {
-        //         debug!("Sending line coding");
-        //         let coding = self.shared().line_coding.lock(Cell::get);
-        //         assert!(buf.len() >= 7);
-        //         buf[0..4].copy_from_slice(&coding.data_rate.to_le_bytes());
-        //         buf[4] = coding.stop_bits as u8;
-        //         buf[5] = coding.parity_type as u8;
-        //         buf[6] = coding.data_bits;
-        //         Some(InResponse::Accepted(&buf[0..7]))
-        //     }
-        //     _ => Some(InResponse::Rejected),
-        // }
+        match req.request {
+            USB_BULK_ONLY_GET_MAX_LUN if req.length == 1 => {
+                buf[0] = 1; // Only one lun supported!
+                Some(InResponse::Accepted(&buf[0..1]))
+            }
+            _ => Some(InResponse::Rejected),
+        }
     }
 }
