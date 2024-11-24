@@ -2,50 +2,11 @@
 #[allow(unused_imports)]
 #[rustfmt::skip]
 pub mod pac {
-    // The nRF9160 has a secure and non-secure (NS) mode.
-    // To avoid cfg spam, we remove _ns or _s suffixes here.
+    pub use nrf_pac::*;
 
+    #[cfg(feature = "_ns")]
     #[doc(no_inline)]
-    pub use nrf9160_pac::{
-        interrupt,
-        Interrupt,
-
-        cc_host_rgf_s as cc_host_rgf,
-        clock_ns as clock,
-        cryptocell_s as cryptocell,
-        ctrl_ap_peri_s as ctrl_ap_peri,
-        dppic_ns as dppic,
-        egu0_ns as egu0,
-        ficr_s as ficr,
-        fpu_ns as fpu,
-        gpiote0_s as gpiote,
-        i2s_ns as i2s,
-        ipc_ns as ipc,
-        kmu_ns as kmu,
-        nvmc_ns as nvmc,
-        p0_ns as p0,
-        pdm_ns as pdm,
-        power_ns as power,
-        pwm0_ns as pwm0,
-        regulators_ns as regulators,
-        rtc0_ns as rtc0,
-        saadc_ns as saadc,
-        spim0_ns as spim0,
-        spis0_ns as spis0,
-        spu_s as spu,
-        tad_s as tad,
-        timer0_ns as timer0,
-        twim0_ns as twim0,
-        twis0_ns as twis0,
-        uarte0_ns as uarte0,
-        uicr_s as uicr,
-        vmc_ns as vmc,
-        wdt_ns as wdt,
-    };
-    
-    #[cfg(feature = "nrf9160-ns")]
-    #[doc(no_inline)]
-    pub use nrf9160_pac::{
+    pub use nrf_pac::{
         CLOCK_NS as CLOCK,
         DPPIC_NS as DPPIC,
         EGU0_NS as EGU0,
@@ -98,9 +59,9 @@ pub mod pac {
         WDT_NS as WDT,
     };
 
-    #[cfg(feature = "nrf9160-s")]
+    #[cfg(feature = "_s")]
     #[doc(no_inline)]
-    pub use nrf9160_pac::{
+    pub use nrf_pac::{
         CC_HOST_RGF_S as CC_HOST_RGF,
         CLOCK_S as CLOCK,
         CRYPTOCELL_S as CRYPTOCELL,
@@ -167,7 +128,7 @@ pub const FORCE_COPY_BUFFER_SIZE: usize = 1024;
 
 pub const FLASH_SIZE: usize = 1024 * 1024;
 
-embassy_hal_common::peripherals! {
+embassy_hal_internal::peripherals! {
     // RTC
     RTC0,
     RTC1,
@@ -269,37 +230,47 @@ embassy_hal_common::peripherals! {
 
     // PDM
     PDM,
+
+    // EGU
+    EGU0,
+    EGU1,
+    EGU2,
+    EGU3,
+    EGU4,
+    EGU5,
 }
 
-impl_uarte!(SERIAL0, UARTE0, UARTE0_SPIM0_SPIS0_TWIM0_TWIS0);
-impl_uarte!(SERIAL1, UARTE1, UARTE1_SPIM1_SPIS1_TWIM1_TWIS1);
-impl_uarte!(SERIAL2, UARTE2, UARTE2_SPIM2_SPIS2_TWIM2_TWIS2);
-impl_uarte!(SERIAL3, UARTE3, UARTE3_SPIM3_SPIS3_TWIM3_TWIS3);
+impl_uarte!(SERIAL0, UARTE0, SERIAL0);
+impl_uarte!(SERIAL1, UARTE1, SERIAL1);
+impl_uarte!(SERIAL2, UARTE2, SERIAL2);
+impl_uarte!(SERIAL3, UARTE3, SERIAL3);
 
-impl_spim!(SERIAL0, SPIM0, UARTE0_SPIM0_SPIS0_TWIM0_TWIS0);
-impl_spim!(SERIAL1, SPIM1, UARTE1_SPIM1_SPIS1_TWIM1_TWIS1);
-impl_spim!(SERIAL2, SPIM2, UARTE2_SPIM2_SPIS2_TWIM2_TWIS2);
-impl_spim!(SERIAL3, SPIM3, UARTE3_SPIM3_SPIS3_TWIM3_TWIS3);
+impl_spim!(SERIAL0, SPIM0, SERIAL0);
+impl_spim!(SERIAL1, SPIM1, SERIAL1);
+impl_spim!(SERIAL2, SPIM2, SERIAL2);
+impl_spim!(SERIAL3, SPIM3, SERIAL3);
 
-impl_spis!(SERIAL0, SPIS0, UARTE0_SPIM0_SPIS0_TWIM0_TWIS0);
-impl_spis!(SERIAL1, SPIS1, UARTE1_SPIM1_SPIS1_TWIM1_TWIS1);
-impl_spis!(SERIAL2, SPIS2, UARTE2_SPIM2_SPIS2_TWIM2_TWIS2);
-impl_spis!(SERIAL3, SPIS3, UARTE3_SPIM3_SPIS3_TWIM3_TWIS3);
+impl_spis!(SERIAL0, SPIS0, SERIAL0);
+impl_spis!(SERIAL1, SPIS1, SERIAL1);
+impl_spis!(SERIAL2, SPIS2, SERIAL2);
+impl_spis!(SERIAL3, SPIS3, SERIAL3);
 
-impl_twim!(SERIAL0, TWIM0, UARTE0_SPIM0_SPIS0_TWIM0_TWIS0);
-impl_twim!(SERIAL1, TWIM1, UARTE1_SPIM1_SPIS1_TWIM1_TWIS1);
-impl_twim!(SERIAL2, TWIM2, UARTE2_SPIM2_SPIS2_TWIM2_TWIS2);
-impl_twim!(SERIAL3, TWIM3, UARTE3_SPIM3_SPIS3_TWIM3_TWIS3);
+impl_twim!(SERIAL0, TWIM0, SERIAL0);
+impl_twim!(SERIAL1, TWIM1, SERIAL1);
+impl_twim!(SERIAL2, TWIM2, SERIAL2);
+impl_twim!(SERIAL3, TWIM3, SERIAL3);
 
-impl_twis!(SERIAL0, TWIS0, UARTE0_SPIM0_SPIS0_TWIM0_TWIS0);
-impl_twis!(SERIAL1, TWIS1, UARTE1_SPIM1_SPIS1_TWIM1_TWIS1);
-impl_twis!(SERIAL2, TWIS2, UARTE2_SPIM2_SPIS2_TWIM2_TWIS2);
-impl_twis!(SERIAL3, TWIS3, UARTE3_SPIM3_SPIS3_TWIM3_TWIS3);
+impl_twis!(SERIAL0, TWIS0, SERIAL0);
+impl_twis!(SERIAL1, TWIS1, SERIAL1);
+impl_twis!(SERIAL2, TWIS2, SERIAL2);
+impl_twis!(SERIAL3, TWIS3, SERIAL3);
 
 impl_pwm!(PWM0, PWM0, PWM0);
 impl_pwm!(PWM1, PWM1, PWM1);
 impl_pwm!(PWM2, PWM2, PWM2);
 impl_pwm!(PWM3, PWM3, PWM3);
+
+impl_pdm!(PDM, PDM, PDM);
 
 impl_timer!(TIMER0, TIMER0, TIMER0);
 impl_timer!(TIMER1, TIMER1, TIMER1);
@@ -364,40 +335,43 @@ impl_saadc_input!(P0_18, ANALOG_INPUT5);
 impl_saadc_input!(P0_19, ANALOG_INPUT6);
 impl_saadc_input!(P0_20, ANALOG_INPUT7);
 
-pub mod irqs {
-    use embassy_cortex_m::interrupt::_export::declare;
+impl_egu!(EGU0, EGU0, EGU0);
+impl_egu!(EGU1, EGU1, EGU1);
+impl_egu!(EGU2, EGU2, EGU2);
+impl_egu!(EGU3, EGU3, EGU3);
+impl_egu!(EGU4, EGU4, EGU4);
+impl_egu!(EGU5, EGU5, EGU5);
 
-    use crate::pac::Interrupt as InterruptEnum;
-
-    declare!(SPU);
-    declare!(CLOCK_POWER);
-    declare!(UARTE0_SPIM0_SPIS0_TWIM0_TWIS0);
-    declare!(UARTE1_SPIM1_SPIS1_TWIM1_TWIS1);
-    declare!(UARTE2_SPIM2_SPIS2_TWIM2_TWIS2);
-    declare!(UARTE3_SPIM3_SPIS3_TWIM3_TWIS3);
-    declare!(GPIOTE0);
-    declare!(SAADC);
-    declare!(TIMER0);
-    declare!(TIMER1);
-    declare!(TIMER2);
-    declare!(RTC0);
-    declare!(RTC1);
-    declare!(WDT);
-    declare!(EGU0);
-    declare!(EGU1);
-    declare!(EGU2);
-    declare!(EGU3);
-    declare!(EGU4);
-    declare!(EGU5);
-    declare!(PWM0);
-    declare!(PWM1);
-    declare!(PWM2);
-    declare!(PDM);
-    declare!(PWM3);
-    declare!(I2S);
-    declare!(IPC);
-    declare!(FPU);
-    declare!(GPIOTE1);
-    declare!(KMU);
-    declare!(CRYPTOCELL);
-}
+embassy_hal_internal::interrupt_mod!(
+    SPU,
+    CLOCK_POWER,
+    SERIAL0,
+    SERIAL1,
+    SERIAL2,
+    SERIAL3,
+    GPIOTE0,
+    SAADC,
+    TIMER0,
+    TIMER1,
+    TIMER2,
+    RTC0,
+    RTC1,
+    WDT,
+    EGU0,
+    EGU1,
+    EGU2,
+    EGU3,
+    EGU4,
+    EGU5,
+    PWM0,
+    PWM1,
+    PWM2,
+    PWM3,
+    PDM,
+    I2S,
+    IPC,
+    FPU,
+    GPIOTE1,
+    KMU,
+    CRYPTOCELL,
+);
