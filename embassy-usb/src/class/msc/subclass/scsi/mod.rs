@@ -99,7 +99,7 @@ impl<'d, B: BlockDevice> Scsi<'d, B> {
                 let start_lba = req.lba();
                 let transfer_length = req.transfer_length() as u32;
 
-                if start_lba + transfer_length > self.device.num_blocks()? {
+                if start_lba + transfer_length > self.device.num_blocks().await? {
                     return Err(InternalError::LbaOutOfRange);
                 }
 
@@ -277,7 +277,7 @@ impl<'d, B: BlockDevice> Scsi<'d, B> {
                 debug!("{:?}", req);
 
                 let mut resp = ReadCapacity10Response::new();
-                resp.set_max_lba(self.device.num_blocks()? - 1);
+                resp.set_max_lba(self.device.num_blocks().await? - 1);
                 resp.set_block_size(self.device.block_size()? as u32);
 
                 pipe.write(&resp.data).await?;
@@ -289,7 +289,7 @@ impl<'d, B: BlockDevice> Scsi<'d, B> {
 
                 let mut resp = ReadFormatCapacitiesResponse::new();
                 resp.set_capacity_list_length(8);
-                resp.set_num_blocks(self.device.num_blocks()?);
+                resp.set_num_blocks(self.device.num_blocks().await?);
                 resp.set_block_size(self.device.block_size()? as u32);
                 resp.set_descriptor_type(0x03);
 
@@ -303,7 +303,7 @@ impl<'d, B: BlockDevice> Scsi<'d, B> {
                 let start_lba = req.lba();
                 let transfer_length = req.transfer_length() as u32;
 
-                if start_lba + transfer_length > self.device.num_blocks()? {
+                if start_lba + transfer_length > self.device.num_blocks().await? {
                     return Err(InternalError::LbaOutOfRange);
                 }
 
@@ -443,6 +443,10 @@ impl InternalError {
                 BlockDeviceError::EraseError => SenseData {
                     key: SenseKey::MediumError,
                     asc: AdditionalSenseCode::EraseFailure,
+                },
+                BlockDeviceError::Unknown => SenseData {
+                    key: SenseKey::MediumError,
+                    asc: AdditionalSenseCode::InvalidCommandOperationCode,
                 },
             },
             InternalError::DataPipeError(_) => SenseData {

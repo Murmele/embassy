@@ -19,6 +19,8 @@ pub enum BlockDeviceError {
     WriteError,
     /// SCSI MEDIUM ERROR 51h/00h ERASE FAILURE
     EraseError,
+    /// Unknown error
+    Unknown,
 }
 
 pub trait BlockDevice {
@@ -32,7 +34,7 @@ pub trait BlockDevice {
     fn block_size(&self) -> Result<usize, BlockDeviceError>;
 
     /// Number of blocks in device
-    fn num_blocks(&self) -> Result<u32, BlockDeviceError>;
+    async fn num_blocks(&self) -> Result<u32, BlockDeviceError>;
 
     /// Read the block indicated by `lba` into the provided buffer
     async fn read_block(&self, lba: u32, block: &mut [u8]) -> Result<(), BlockDeviceError>;
