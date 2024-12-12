@@ -13,6 +13,44 @@ use crate::control::{InResponse, Request, RequestType};
 use crate::driver::Driver;
 use crate::types::InterfaceNumber;
 use crate::{Builder, Handler};
+#[cfg(feature = "rtos-trace")]
+use rtos_trace::trace;
+
+#[derive(Clone, Copy)]
+enum Markers {
+    BulkOutWrite = 20,
+    BulkOutWriteChunk = 21,
+}
+
+struct Marker {
+    #[cfg(feature = "rtos-trace")]
+    marker: Markers,
+}
+
+impl Marker {
+    #[allow(dead_code)]
+    pub fn new(_marker: Markers) -> Self {
+        #[cfg(feature = "rtos-trace")]
+        trace::marker_begin(_marker.into());
+        Marker {
+            #[cfg(feature = "rtos-trace")]
+            marker: _marker,
+        }
+    }
+}
+
+impl Drop for Marker {
+    fn drop(&mut self) {
+        #[cfg(feature = "rtos-trace")]
+        trace::marker_end(self.marker.into());
+    }
+}
+
+impl From<Markers> for u32 {
+    fn from(value: Markers) -> Self {
+        value as u32
+    }
+}
 
 const REQ_GET_MAX_LUN: u8 = 0xFE;
 const REQ_BULK_ONLY_RESET: u8 = 0xFF;
@@ -176,7 +214,7 @@ impl<'d, D: Driver<'d>, C: CommandSetHandler> BulkOnlyTransport<'d, D, C> {
     pub async fn run(&mut self) {
         loop {
             let cbw = self.receive_control_block_wrapper().await;
-            trace!("received CBW");
+            //trace!("received CBW: {}", cbw.data_transfer_length);
 
             let csw = match cbw.dir() {
                 Direction::Out => {
@@ -205,15 +243,18 @@ pub struct BulkOnlyTransportDataPipeIn<'d, E: EndpointIn> {
 
 impl<'d, E: EndpointIn> DataPipeIn for BulkOnlyTransportDataPipeIn<'d, E> {
     async fn write(&mut self, buf: &[u8]) -> Result<(), DataPipeError> {
+        let m = Marker::new(Markers::BulkOutWrite);
         if self.last_packet_size > 0 && self.last_packet_size != self.max_packet_size {
             return Err(DataPipeError::TransferFinalized);
         }
 
-        for chunk in buf.chunks(self.max_packet_size.into()) {
+        trace!("Write data into InEndpoint: {}", buf.len());
+        for (i, chunk) in buf.chunks(self.max_packet_size.into()).into_iter().enumerate() {
+            let m = Marker::new(Markers::BulkOutWriteChunk);
             if self.data_residue < chunk.len() as _ {
                 return Err(DataPipeError::TransferSizeExceeded);
             }
-
+            // trace!("Write data into InEndpoint Chunk: {}", i);
             self.ep.write(chunk).await?;
             self.data_residue -= chunk.len() as u32;
             self.last_packet_size = chunk.len() as u16;
@@ -247,6 +288,8 @@ impl<'d, E: EndpointOut> DataPipeOut for BulkOnlyTransportDataPipeOut<'d, E> {
         if !self.last_packet_full {
             return Err(DataPipeError::TransferFinalized);
         }
+
+        trace!("Write data into InEndpoint");
 
         for chunk in buf.chunks_mut(self.max_packet_size.into()) {
             if self.data_residue < chunk.len() as _ {
