@@ -109,9 +109,17 @@ impl<'d, B: BlockDevice> Scsi<'d, B> {
                     "SCSI buffer smaller than device block size"
                 );
 
-                for lba in start_lba..start_lba + transfer_length {
+                if transfer_length == 0 {
+                } else if transfer_length == 1 {
                     pipe.read(&mut self.buffer[..block_size]).await?;
-                    self.device.write_block(lba, &self.buffer[..block_size]).await?;
+                    self.device.write_block(start_lba, &self.buffer[..block_size]).await?;
+                } else {
+                    self.device.prepare_multiblock_write(start_lba, transfer_length).await?;
+                    for _lba in start_lba..start_lba + transfer_length {
+                        pipe.read(&mut self.buffer[..block_size]).await?;
+                        self.device.write_multiblock_block(&self.buffer[..block_size]).await?;
+                    }
+                    self.device.stop_multiblock_write().await?;
                 }
 
                 Ok(())
@@ -313,10 +321,22 @@ impl<'d, B: BlockDevice> Scsi<'d, B> {
                     "SCSI buffer smaller than device block size"
                 );
 
-                for lba in start_lba..start_lba + transfer_length {
-                    self.device.read_block(lba, &mut self.buffer[..block_size]).await?;
-
+                if transfer_length == 0 {
+                } else if transfer_length == 1 {
+                    self.device
+                        .read_block(start_lba, &mut self.buffer[..block_size])
+                        .await?;
                     pipe.write(&self.buffer[..block_size]).await?;
+                } else {
+                    self.device.prepare_multiblock_read(start_lba).await?;
+                    for _lba in start_lba..start_lba + transfer_length {
+                        self.device
+                            .read_multiblock_block(&mut self.buffer[..block_size])
+                            .await?;
+
+                        pipe.write(&self.buffer[..block_size]).await?;
+                    }
+                    self.device.stop_multiblock_read().await?;
                 }
 
                 Ok(())

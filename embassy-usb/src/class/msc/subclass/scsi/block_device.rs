@@ -41,4 +41,16 @@ pub trait BlockDevice {
 
     /// Write the `block` buffer to the block indicated by `lba`
     async fn write_block(&mut self, lba: u32, block: &[u8]) -> Result<(), BlockDeviceError>;
+
+    async fn prepare_multiblock_write(&mut self, lba: u32, blocks_count: u32) -> Result<(), BlockDeviceError>;
+
+    async fn write_multiblock_block(&mut self, block: &[u8]) -> Result<(), BlockDeviceError>;
+
+    async fn stop_multiblock_write(&mut self) -> Result<(), BlockDeviceError>;
+
+    async fn prepare_multiblock_read(&mut self, lba: u32) -> Result<(), BlockDeviceError>;
+
+    async fn read_multiblock_block(&mut self, block: &mut [u8]) -> Result<(), BlockDeviceError>;
+
+    async fn stop_multiblock_read(&mut self) -> Result<(), BlockDeviceError>;
 }
