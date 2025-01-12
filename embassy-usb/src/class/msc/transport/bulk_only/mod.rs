@@ -243,12 +243,12 @@ pub struct BulkOnlyTransportDataPipeIn<'d, E: EndpointIn> {
 
 impl<'d, E: EndpointIn> DataPipeIn for BulkOnlyTransportDataPipeIn<'d, E> {
     async fn write(&mut self, buf: &[u8]) -> Result<(), DataPipeError> {
-        let m = Marker::new(Markers::BulkOutWrite);
+        // let m = Marker::new(Markers::BulkOutWrite);
         if self.last_packet_size > 0 && self.last_packet_size != self.max_packet_size {
             return Err(DataPipeError::TransferFinalized);
         }
 
-        debug!("Write data into InEndpoint: {}", buf.len());
+        error!("WIn: {}", buf.len());
         for (i, chunk) in buf.chunks(self.max_packet_size.into()).into_iter().enumerate() {
             // let m = Marker::new(Markers::BulkOutWriteChunk);
             if self.data_residue < chunk.len() as _ {

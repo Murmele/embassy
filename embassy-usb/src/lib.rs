@@ -33,6 +33,8 @@ use crate::descriptor_reader::foreach_endpoint;
 use crate::driver::{Bus, ControlPipe, Direction, Driver, EndpointAddress, Event};
 use crate::types::{InterfaceNumber, StringIndex};
 
+use defmt_rtt as _;
+
 /// The global state of the USB device.
 ///
 /// In general class traffic is only possible in the `Configured` state.

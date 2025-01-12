@@ -41,6 +41,7 @@ pub struct Scsi<'d, B: BlockDevice> {
     sense: Option<SenseData>,
     vendor_id: [u8; 8],
     product_id: [u8; 16],
+    total_block_count_read: u32,
 }
 
 impl<'d, B: BlockDevice> Scsi<'d, B> {
@@ -57,6 +58,7 @@ impl<'d, B: BlockDevice> Scsi<'d, B> {
             sense: None,
             vendor_id,
             product_id,
+            total_block_count_read: 0,
         }
     }
 
@@ -322,25 +324,32 @@ impl<'d, B: BlockDevice> Scsi<'d, B> {
                     "SCSI buffer smaller than device block size"
                 );
 
-                debug!("Start reading data. Count: {}", transfer_length);
+                error!("srd. Count: {}", transfer_length);
+                self.total_block_count_read += transfer_length;
+                error!("srd. Total Count: {}", self.total_block_count_read);
                 if transfer_length == 0 {
                 } else if transfer_length == 1 {
+                    error!("Srfsd");
                     self.device
                         .read_block(start_lba, &mut self.buffer[..block_size])
                         .await?;
+                    error!("ssth");
                     pipe.write(&self.buffer[..block_size]).await?;
+                    error!("fts");
                 } else {
-                    self.device.prepare_multiblock_read(start_lba).await?;
+                    self.device.prepare_multiblock_read(start_lba).await.unwrap();
                     for _lba in start_lba..start_lba + transfer_length {
-                        debug!("Start reading from SDCard");
+                        error!("Srfsd");
                         self.device
                             .read_multiblock_block(&mut self.buffer[..block_size])
-                            .await?;
+                            .await
+                            .unwrap();
 
-                        debug!("Start sending to host");
-                        pipe.write(&self.buffer[..block_size]).await?;
+                        error!("ssth");
+                        pipe.write(&self.buffer[..block_size]).await.unwrap();
                     }
-                    self.device.stop_multiblock_read().await?;
+                    error!("fts");
+                    self.device.stop_multiblock_read().await.unwrap();
                 }
 
                 Ok(())
