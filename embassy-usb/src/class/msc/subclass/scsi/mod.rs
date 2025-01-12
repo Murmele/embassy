@@ -109,6 +109,7 @@ impl<'d, B: BlockDevice> Scsi<'d, B> {
                     "SCSI buffer smaller than device block size"
                 );
 
+                debug!("Start writing data. Count: {}", transfer_length);
                 if transfer_length == 0 {
                 } else if transfer_length == 1 {
                     pipe.read(&mut self.buffer[..block_size]).await?;
@@ -321,6 +322,7 @@ impl<'d, B: BlockDevice> Scsi<'d, B> {
                     "SCSI buffer smaller than device block size"
                 );
 
+                debug!("Start reading data. Count: {}", transfer_length);
                 if transfer_length == 0 {
                 } else if transfer_length == 1 {
                     self.device
@@ -330,10 +332,12 @@ impl<'d, B: BlockDevice> Scsi<'d, B> {
                 } else {
                     self.device.prepare_multiblock_read(start_lba).await?;
                     for _lba in start_lba..start_lba + transfer_length {
+                        debug!("Start reading from SDCard");
                         self.device
                             .read_multiblock_block(&mut self.buffer[..block_size])
                             .await?;
 
+                        debug!("Start sending to host");
                         pipe.write(&self.buffer[..block_size]).await?;
                     }
                     self.device.stop_multiblock_read().await?;

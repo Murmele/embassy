@@ -248,9 +248,9 @@ impl<'d, E: EndpointIn> DataPipeIn for BulkOnlyTransportDataPipeIn<'d, E> {
             return Err(DataPipeError::TransferFinalized);
         }
 
-        trace!("Write data into InEndpoint: {}", buf.len());
+        debug!("Write data into InEndpoint: {}", buf.len());
         for (i, chunk) in buf.chunks(self.max_packet_size.into()).into_iter().enumerate() {
-            let m = Marker::new(Markers::BulkOutWriteChunk);
+            // let m = Marker::new(Markers::BulkOutWriteChunk);
             if self.data_residue < chunk.len() as _ {
                 return Err(DataPipeError::TransferSizeExceeded);
             }
@@ -289,7 +289,7 @@ impl<'d, E: EndpointOut> DataPipeOut for BulkOnlyTransportDataPipeOut<'d, E> {
             return Err(DataPipeError::TransferFinalized);
         }
 
-        trace!("Write data into InEndpoint");
+        debug!("Read data from out ep");
 
         for chunk in buf.chunks_mut(self.max_packet_size.into()) {
             if self.data_residue < chunk.len() as _ {
