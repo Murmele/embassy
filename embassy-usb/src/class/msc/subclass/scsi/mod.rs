@@ -33,18 +33,19 @@ pub struct SenseData {
     asc: AdditionalSenseCode,
 }
 
-pub struct Scsi<'d, B: BlockDevice> {
+pub struct Scsi<'d, B: BlockDevice, const N: usize> {
     /// Backing storage block device
     device: B,
-    buffer: &'d mut [u8],
+    buffers: &'d mut [[u8; N]],
     /// Last operation sense data
     sense: Option<SenseData>,
     vendor_id: [u8; 8],
     product_id: [u8; 16],
 }
 
-impl<'d, B: BlockDevice> Scsi<'d, B> {
-    pub fn new(device: B, buffer: &'d mut [u8], vendor: &str, product: &str) -> Self {
+impl<'d, B: BlockDevice, const N: usize> Scsi<'d, B, N> {
+    pub fn new(device: B, buffers: &'d mut [[u8; N]], vendor: &str, product: &str) -> Self {
+        assert!(!buffers.is_empty());
         let mut vendor_id = [b' '; 8];
         fill_from_slice(&mut vendor_id, vendor.as_bytes());
 
@@ -53,7 +54,7 @@ impl<'d, B: BlockDevice> Scsi<'d, B> {
 
         Self {
             device,
-            buffer,
+            buffers,
             sense: None,
             vendor_id,
             product_id,
@@ -105,20 +106,43 @@ impl<'d, B: BlockDevice> Scsi<'d, B> {
 
                 let block_size = self.device.block_size()?;
                 assert!(
-                    block_size <= self.buffer.len(),
+                    block_size <= self.buffers[0].len(),
                     "SCSI buffer smaller than device block size"
                 );
 
                 if transfer_length == 0 {
                 } else if transfer_length == 1 {
-                    pipe.read(&mut self.buffer[..block_size]).await?;
-                    self.device.write_block(start_lba, &self.buffer[..block_size]).await?;
-                } else {
+                    pipe.read(&mut self.buffers[0][..block_size]).await?;
+                    self.device
+                        .write_block(start_lba, &self.buffers[0][..block_size])
+                        .await?;
+                } else if self.buffers.len() == 1 {
                     self.device.prepare_multiblock_write(start_lba, transfer_length).await?;
                     for _lba in start_lba..start_lba + transfer_length {
-                        pipe.read(&mut self.buffer[..block_size]).await?;
-                        self.device.write_multiblock_block(&self.buffer[..block_size]).await?;
+                        pipe.read(&mut self.buffers[0][..block_size]).await?;
+                        self.device
+                            .write_multiblock_block(&self.buffers[0][..block_size])
+                            .await?;
                     }
+                    self.device.stop_multiblock_write().await?;
+                } else {
+                    self.device.prepare_multiblock_write(start_lba, transfer_length).await?;
+                    let (a, b) = self.buffers.split_at_mut(1);
+                    let (mut drain, mut fill) = (&mut a[0], &mut b[0]);
+
+                    pipe.read(&mut drain[..block_size]).await?;
+                    for _i in 0..transfer_length - 1 {
+                        let (r, w) = embassy_futures::join::join(
+                            pipe.read(&mut fill[..block_size]),
+                            self.device.write_multiblock_block(&drain[..block_size]),
+                        )
+                        .await;
+                        r?;
+                        w?;
+
+                        core::mem::swap(&mut drain, &mut fill);
+                    }
+                    self.device.write_multiblock_block(&drain[..block_size]).await?; // last write
                     self.device.stop_multiblock_write().await?;
                 }
 
@@ -220,7 +244,8 @@ impl<'d, B: BlockDevice> Scsi<'d, B> {
 
                 // pipe.write(&buf).await?;
 
-                let mut writer = ModeParameter6Writer::new(self.buffer).map_err(|_| ERR_INVALID_FIELD_IN_CBD)?;
+                let mut writer =
+                    ModeParameter6Writer::new(&mut self.buffers[0]).map_err(|_| ERR_INVALID_FIELD_IN_CBD)?;
 
                 let all_pages = matches!(req.page_code(), Ok(PageCode::AllPages));
 
@@ -317,25 +342,45 @@ impl<'d, B: BlockDevice> Scsi<'d, B> {
 
                 let block_size = self.device.block_size()?;
                 assert!(
-                    block_size <= self.buffer.len(),
+                    block_size <= self.buffers[0].len(),
                     "SCSI buffer smaller than device block size"
                 );
 
                 if transfer_length == 0 {
                 } else if transfer_length == 1 {
                     self.device
-                        .read_block(start_lba, &mut self.buffer[..block_size])
+                        .read_block(start_lba, &mut self.buffers[0][..block_size])
                         .await?;
-                    pipe.write(&self.buffer[..block_size]).await?;
-                } else {
+                    pipe.write(&self.buffers[0][..block_size]).await?;
+                } else if self.buffers.len() < 2 {
                     self.device.prepare_multiblock_read(start_lba).await?;
                     for _lba in start_lba..start_lba + transfer_length {
                         self.device
-                            .read_multiblock_block(&mut self.buffer[..block_size])
+                            .read_multiblock_block(&mut self.buffers[0][..block_size])
                             .await?;
 
-                        pipe.write(&self.buffer[..block_size]).await?;
+                        pipe.write(&self.buffers[0][..block_size]).await?;
                     }
+                    self.device.stop_multiblock_read().await?;
+                } else {
+                    self.device.prepare_multiblock_read(start_lba).await?;
+
+                    let (a, b) = self.buffers.split_at_mut(1);
+                    let (mut drain, mut fill) = (&mut a[0], &mut b[0]);
+
+                    self.device.read_multiblock_block(&mut drain[..block_size]).await?;
+                    for _i in 0..transfer_length - 1 {
+                        let (r, w) = embassy_futures::join::join(
+                            self.device.read_multiblock_block(&mut fill[..block_size]),
+                            pipe.write(&drain[..block_size]),
+                        )
+                        .await;
+                        r?;
+                        w?;
+
+                        core::mem::swap(&mut drain, &mut fill);
+                    }
+                    pipe.write(&drain[..block_size]).await?;
                     self.device.stop_multiblock_read().await?;
                 }
 
@@ -346,7 +391,7 @@ impl<'d, B: BlockDevice> Scsi<'d, B> {
     }
 }
 
-impl<'d, B: BlockDevice> CommandSetHandler for Scsi<'d, B> {
+impl<'d, B: BlockDevice, const N: usize> CommandSetHandler for Scsi<'d, B, N> {
     const MSC_SUBCLASS: MscSubclass = MscSubclass::ScsiTransparentCommandSet;
     const MAX_LUN: u8 = 0;
 
